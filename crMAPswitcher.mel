@@ -1,0 +1,142 @@
+/* ******************************* 
+******************************* 
+
+MAP Switcher 1.0
+
+Created On Feb 27th 2009
+Authored By - Crunk AKA Savio Fernandes
+
+Install & Execute:
+-Copy this file to your maya default script directory
+-Source "crMAPswitcher.mel"
+
+*******************************
+CONTACT
+
+www.artbycrunk.com/blog
+artbycrunk@gmail.com
+********************************** */
+
+global proc crMAPswitcher()
+{
+
+	if (`window -q -ex crMPSWin`) deleteUI crMPSWin;
+	window -title "crMAPswitcher 1.0" -w 230 -h 139 -s 0 crMPSWin ;
+	columnLayout -adjustableColumn true;
+	radioButtonGrp -numberOfRadioButtons 2 -cw 1 55 -sl 2 -labelArray2 "All" "Selected" SelChkBx;
+	separator;separator;
+	button -l "Convert textures to .map" -c "crMPS_MAPConvertAll(0)";
+	button -l "Convert only non-existent .map" -c "crMPS_MAPConvertAll(1)" ;
+	separator;
+	button -l "Switch to .map files" -c "crMPS_MAPSwapMap()" ;
+	button -l "Switch to use original files" -c "crMPS_MAPSwapOriginal()" ;
+	
+	showWindow crMPSWin;
+	
+}
+
+global proc crMPS_MAPConvertAll( int $skip_existing) {
+
+	string $fullPath,$fileTextures[];
+	int $selection = `radioButtonGrp -q -sl SelChkBx`;
+	if ($selection == 1){$fileTextures = `ls -type file -type mentalrayTexture`;
+	}else{$fileTextures = `ls -sl -type file -type mentalrayTexture`;}
+	if(size($fileTextures)){
+	for($fileTexture in $fileTextures){
+      $fullPath = getAttr ($fileTexture + ".fileTextureName");
+      $fileTextureDir = dirname($fullPath);
+      $fileTextureName_orig = basename($fullPath, "");
+	  string $extension = `substring $fileTextureName_orig (size($fileTextureName_orig)-3) (size($fileTextureName_orig))`;
+	  $fileTextureName = basename($fullPath, $extension);
+	  
+		if ( size(match("\.map$",$fullPath)) == 0 ) { 
+	      if ( !`filetest -f ($fullPath+".map")` || $skip_existing == 0 ) {
+				chdir $fileTextureDir;
+				$imfString = "imf_copy -r -p \""+$fileTextureName_orig+"\" \""+$fileTextureName+".map\" map";
+				print (" Currently Converting: "+$fullPath);
+				system ($imfString);
+			} else {
+	        print (" Skipped: "+$fullPath+" (.map exists)");
+	      }
+		}
+   }
+   print("\n All Done!\n");
+   }else{
+   error("There are no file nodes, or u have nuttin selected");
+   }
+   
+
+}
+
+global proc crMPS_MAPSwapMap () {
+
+	string $fullPath,$fileTextures[];
+	int $selection = `radioButtonGrp -q -sl SelChkBx`;
+	
+	if ($selection == 1){$fileTextures = `ls -type file -type mentalrayTexture`;}
+	else{$fileTextures = `ls -sl -type file -type mentalrayTexture`;}
+	
+	if(size($fileTextures)){
+    print("\n****** Now using .map textures *******\n");
+   
+   for($fileTexture in $fileTextures){
+      $fullPath = getAttr ($fileTexture + ".fileTextureName");
+	  
+	  $fileTextureDir = dirname($fullPath);
+      $fileTextureName_orig = basename($fullPath, "");
+	  string $extension = `substring $fileTextureName_orig (size($fileTextureName_orig)-3) (size($fileTextureName_orig))`;
+	  $fileTextureName = basename($fullPath, $extension);
+	  
+	  if (`attributeExists "MapSwitchPath" $fileTexture`)
+	  {setAttr -type "string" ($fileTexture+".MapSwitchPath") $extension;
+	  }else{addAttr -ln "MapSwitchPath" -nn "Map Switch Path" -dt "string"  $fileTexture;
+			setAttr -type "string" ($fileTexture+".MapSwitchPath") $extension;}
+	  
+		if ( size(match("\.map$",$fullPath)) == 0 ) { 
+			if ( `filetest -f ($fileTextureName+".map")` ) { 
+				setAttr ($fileTexture +".fileTextureName") -type "string" ($fileTextureName+".map");
+			} else {
+				print (($fileTextureName+".map") +" doesn't exist");
+			}
+		}
+	}
+   print("\n All Done!\n");
+	}else{
+	error("There are no file nodes, or u have nuttin selected");
+	}
+	}
+
+global proc crMPS_MAPSwapOriginal () {
+
+	string $fullPath,$fileTextures[],$extension;
+	int $selection = `radioButtonGrp -q -sl SelChkBx`;
+	
+	if ($selection == 1){$fileTextures = `ls -type file -type mentalrayTexture`;}
+	else{$fileTextures = `ls -sl -type file -type mentalrayTexture`;}
+	
+	if(size($fileTextures)){
+		print ("\n****** Now using original textures *******\n");
+		
+		for($fileTexture in $fileTextures){
+		
+			if (`attributeExists "MapSwitchPath" $fileTexture`)
+			{
+			$extension = `getAttr $fileTexture.MapSwitchPath`;
+			}
+			$fullPath = getAttr ($fileTexture + ".fileTextureName");
+			$originalFile = basename($fullPath, ".map")+$extension;
+				if ( `filetest -f $originalFile` ) {
+			print(" Set filenode "+$fileTexture+" to use "+ $originalFile + "");
+			setAttr ($fileTexture+".fileTextureName") -type "string" $originalFile;
+		} else {
+			print($fileTexture+" because "+ $originalFile +" doesn't exist");
+		}
+      
+   }
+   print(" --done--\n");
+}else{
+error("There are no file nodes, or u have nuttin selected");
+}
+}
+
+crMAPswitcher();
